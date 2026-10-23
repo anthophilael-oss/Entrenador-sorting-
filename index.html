@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrenador Wh- Anthophila - Maestría</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', 'Arial', sans-serif;
+            background-color: #ffffff;
+            color: #333;
+            overflow-x: hidden;
+            line-height: 2.0;
+        }
+        .drop-zone {
+            min-height: 140px;
+            transition: all 0.3s ease;
+        }
+        .drop-zone.highlight {
+            animation: pulse-border 1s infinite;
+        }
+        @keyframes pulse-border {
+            0% { transform: scale(1); border-color: inherit; }
+            50% { transform: scale(1.05); border-color: #000; border-width: 4px; }
+            100% { transform: scale(1); border-color: inherit; }
+        }
+        .draggable-card { cursor: grab; touch-action: none; }
+        .draggable-card:active { cursor: grabbing; }
+        .feedback-overlay, .custom-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.95); z-index: 1000; display: none;
+        }
+        .progress-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin: 0 4px; border: 1px solid #ccc; }
+        .dot-success { background-color: #10b981; border-color: #059669; }
+        .dot-fail { background-color: #ef4444; border-color: #dc2626; }
+    </style>
+</head>
+<body class="bg-white">
+
+<div id="app" class="max-w-6xl mx-auto p-6">
+    <!-- Header / Status de Maestría -->
+    <header class="flex flex-col md:flex-row justify-between items-center mb-8 border-b pb-4 gap-4">
+        <div class="flex items-center gap-4">
+            <button onclick="goHome()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200 transition">
+                🏠 Ir al Inicio
+            </button>
+            <div>
+                <h1 class="text-2xl font-bold text-blue-600">Entrenador Anthophila</h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span id="step-badge" class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded-full uppercase border border-blue-300">Paso 1: Conoce las Pistas</span>
+                    <p id="current-stage-name" class="text-xs text-gray-500 font-semibold"></p>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-col items-end">
+            <div id="mastery-tracker" class="flex items-center gap-2">
+                <span class="text-xs font-bold uppercase">Estabilidad (3/5):</span>
+                <div id="session-dots"></div>
+            </div>
+            <div class="text-xs font-semibold text-gray-400 mt-1">Meta: 87% Precisión Independiente</div>
+        </div>
+    </header>
+
+    <main id="main-content" class="min-h-[60vh] flex flex-col items-center justify-center">
+        <!-- Inyección dinámica -->
+    </main>
+
+    <footer class="mt-8 flex justify-center">
+        <button id="btn-next" class="hidden bg-blue-600 text-white px-10 py-4 rounded-xl text-2xl font-bold shadow-lg hover:bg-blue-700 transition">Siguiente</button>
+    </footer>
+</div>
+
+<!-- Feedback Overlay -->
+<div id="feedback" class="feedback-overlay">
+    <div class="text-center">
+        <div id="feedback-icon" class="text-9xl mb-4"></div>
+        <div id="feedback-text" class="text-4xl font-bold"></div>
+    </div>
+</div>
+
+<!-- Custom Modal Overlay -->
+<div id="custom-modal" class="custom-modal-overlay">
+    <div class="bg-white p-8 rounded-3xl shadow-2xl border-4 border-blue-200 max-w-md text-center">
+        <h3 id="modal-title" class="text-2xl font-bold mb-4 text-blue-600">Aviso</h3>
+        <p id="modal-message" class="text-gray-700 mb-6 text-lg"></p>
+        <div id="modal-buttons" class="flex justify-center gap-4">
+            <!-- Botones inyectados dinámicamente -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- NIVELES DE APOYO ---
+    const SUPPORT_LEVELS = {
+        1: { name: 'Nivel 1 (Independiente)', desc: '5 segundos para que el niño actúe solo.' },
+        2: { name: 'Nivel 2 (Ayuda Verbal)', desc: 'Se le recuerda la definición de la categoría.' },
+        3: { name: 'Nivel 3 (Ayuda Gestual)', desc: 'El instructor señala la columna correcta sin hablar.' },
+        4: { name: 'Nivel 4 (Ayuda Física/Modelado)', desc: 'El instructor coloca la palabra en su sitio, explica por qué va allí y pide al alumno que repita la acción.' }
+    };
+
+    // --- GALERÍA CON RUTAS LOCALES AL SERVIDOR (.jfif) ---
+    const GALLERIES = {
+        default: {
+            name: 'Galería 1: Predeterminada',
+            categories: [
+                { 
+                    id: 'who', label: '¿Quién?', sublabel: 'Persona', article: 'una', color: 'bg-blue-100', borderColor: 'border-blue-400',
+                    desc: 'Las Personas son los individuos o grupos que aparecen en la historia.',
+                    examples: [
+                        { img: 'imagenes/persona_nina.jfif', name: 'Una Niña', isPositive: true },
+                        { img: 'imagenes/persona_nino.jfif', name: 'Un Niño', isPositive: true },
+                        { img: 'imagenes/persona_doctora.jfif', name: 'Doctora', isPositive: true },
+                        { img: 'imagenes/objeto_pelota.jfif', name: 'Pelota', isPositive: false },
+                        { img: 'imagenes/lugar_parque.jfif', name: 'Parque', isPositive: false },
+                        { img: 'imagenes/accion_correr.jfif', name: 'Correr', isPositive: false }
+                    ]
+                },
+                { 
+                    id: 'where', label: '¿Dónde?', sublabel: 'Lugar', article: 'un', color: 'bg-green-100', borderColor: 'border-green-400',
+                    desc: 'Los Lugares son los espacios o sitios donde ocurre la historia.',
+                    examples: [
+                        { img: 'imagenes/lugar_parque.jfif', name: 'Parque', isPositive: true },
+                        { img: 'imagenes/lugar_playa.jfif', name: 'Playa', isPositive: true },
+                        { img: 'imagenes/lugar_escuela.jfif', name: 'Escuela', isPositive: true },
+                        { img: 'imagenes/persona_nina.jfif', name: 'Niña', isPositive: false },
+                        { img: 'imagenes/objeto_pelota.jfif', name: 'Pelota', isPositive: false },
+                        { img: 'imagenes/accion_correr.jfif', name: 'Correr', isPositive: false }
+                    ]
+                },
+                { 
+                    id: 'what', label: '¿Qué?', sublabel: 'Objeto / Cosa', article: 'un', color: 'bg-yellow-100', borderColor: 'border-yellow-400',
+                    desc: '¿Qué? se refiere a un objeto, cosa o elemento inanimado de la historia.',
+                    examples: [
+                        { img: 'imagenes/objeto_pelota.jfif', name: 'Pelota', isPositive: true },
+                        { img: 'imagenes/objeto_libro.jfif', name: 'Libro', isPositive: true },
+                        { img: 'imagenes/objeto_lapiz.jfif', name: 'Lápiz', isPositive: true },
+                        { img: 'imagenes/persona_doctora.jfif', name: 'Doctora', isPositive: false },
+                        { img: 'imagenes/lugar_parque.jfif', name: 'Parque', isPositive: false },
+                        { img: 'imagenes/accion_correr.jfif', name: 'Correr', isPositive: false }
+                    ]
+                },
+                { 
+                    id: 'action', label: '¿Qué hace?', sublabel: 'Acción / Pasos', article: 'una', color: 'bg-orange-100', borderColor: 'border-orange-400',
+                    desc: '¿Qué hace? se refiere a las acciones específicas o los pasos que realizan los personajes.',
+                    examples: [
+                        { img: 'imagenes/accion_correr.jfif', name: 'Correr', isPositive: true },
+                        { img: 'imagenes/accion_saltar.jfif', name: 'Saltar', isPositive: true },
+                        { img: 'imagenes/accion_comer.jfif', name: 'Comer', isPositive: true },
+                        { img: 'imagenes/lugar_escuela.jfif', name: 'Escuela', isPositive: false },
+                        { img: 'imagenes/objeto_pelota.jfif', name: 'Pelota', isPositive: false },
+                        { img: 'imagenes/persona_nina.jfif', name: 'Niña', isPositive: false }
+                    ]
+                },
+                { 
+                    id: 'task', label: 'Tarea', sublabel: 'Evento', article: 'un', color: 'bg-red-100', borderColor: 'border-red-400',
+                    desc: 'La Tarea es el incidente o suceso principal que describe de qué trata el relato.',
+                    examples: [
+                        { img: 'imagenes/tarea_saludo.jfif', name: 'Lucas saluda a un amigo', isPositive: true },
+                        { img: 'imagenes/tarea_abeja.jfif', name: 'Antonia es una abeja', isPositive: true },
+                        { img: 'imagenes/tarea_cumpleanos.jfif', name: 'Celebrar un cumpleaños', isPositive: true },
+                        { img: 'imagenes/objeto_lapiz.jfif', name: 'Lápiz', isPositive: false },
+                        { img: 'imagenes/objeto_pelota.jfif', name: 'Pelota', isPositive: false },
+                        { img: 'imagenes/persona_doctora.jfif', name: 'Doctora', isPositive: false }
+                    ]
+                }
+            ]
+        }
+    };
+
+    let currentGalleryKey = 'default';
+
+    // --- LÓGICA DE DATOS ---
+    let CONFIG = JSON.parse(JSON.stringify(GALLERIES.default));
+
+    // --- ESTADO DEL SISTEMA ---
+    let state = {
+        currentStage: 'home', 
+        catIdx: 0,
+        subStage: 'intro', 
+        conceptQueue: [], 
+        currentConcept: null,
+        unpromptedScore: 0, 
+        totalItems: 10,
+        supportLevel: 1,
+        maxSupportLevel: 4,
+        sessionHistory: JSON.parse(localStorage.getItem('anthophila_mastery')) || [],
+        scaffoldingTimer: null,
+        sortingItems: [],
+        sortingDetails: []
+    };
+
+    const mainContent = document.getElementById('main-content');
+    const btnNext = document.getElementById('btn-next');
+    const sessionDots = document.getElementById('session-dots');
+    const stageNameDisplay = document.getElementById('current-stage-name');
+    const stepBadge = document.getElementById('step-badge');
+
+    // --- MODAL PERSONALIZADO ---
+    function showCustomModal(title, message, buttonsConfig) {
+        const modal = document.getElementById('custom-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalButtons = document.getElementById('modal-buttons');
+
+        modalTitle.innerText = title;
+        modalMessage.innerText = message;
+        modalButtons.innerHTML = '';
+
+        buttonsConfig.forEach(btn => {
+            const button = document.createElement('button');
+            button.className = btn.className || 'bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow hover:bg-blue-700 transition';
+            button.innerText = btn.text;
+            button.onclick = () => {
+                modal.style.display = 'none';
+                if (btn.onClick) btn.onClick();
+            };
+            modalButtons.appendChild(button);
+        });
+
+        modal.style.display = 'flex';
+    }
+
+    function init() {
+        const savedConfig = loadCustomConfig(currentGalleryKey);
+        if (savedConfig) {
+            CONFIG = sanitizeConfig(savedConfig);
+        }
+        updateMasteryUI();
+        render();
+    }
+
+    function resetCustomConfig() {
+        showCustomModal(
+            "Restablecer Galería",
+            "¿Está seguro de que desea restablecer todas las imágenes personalizadas para esta galería?",
+            [
+                {
+                    text: "Cancelar",
+                    className: "bg-gray-300 text-gray-700 px-6 py-2 rounded-xl font-bold hover:bg-gray-400 transition"
+                },
+                {
+                    text: "Sí, restablecer",
+                    className: "bg-red-500 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-600 transition",
+                    onClick: () => {
+                        localStorage.removeItem(`anthophila_custom_config_${currentGalleryKey}`);
+                        CONFIG = JSON.parse(JSON.stringify(GALLERIES[currentGalleryKey]));
+                        render();
+                    }
+                }
+            ]
+        );
+    }
+
+    function goHome() {
+        state.currentStage = 'home';
+        state.catIdx = 0;
+        state.subStage = 'intro';
+        state.unpromptedScore = 0;
+        state.sortingDetails = [];
+        state.supportLevel = 1;
+        render();
+    }
+
+    function updateStepHeader(badgeText, stageText, badgeColorClass = "bg-blue-100 text-blue-800 border-blue-300") {
+        if (stepBadge) {
+            stepBadge.innerText = badgeText;
+            stepBadge.className = `text-xs font-bold px-3 py-1 rounded-full uppercase border ${badgeColorClass}`;
+        }
+        if (stageNameDisplay) {
+            stageNameDisplay.innerText = stageText;
+        }
+    }
+
+    function renderHome() {
+        updateStepHeader("Paso 0: Preparación", "Centro de Control", "bg-gray-100 text-gray-800 border-gray-300");
+        mainContent.innerHTML = `
+            <div class="w-full max-w-4xl text-center">
+                <!-- Banner de Bienvenida -->
+                <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-8 rounded-3xl shadow-xl mb-8">
+                    <div class="text-6xl mb-4">🕵️‍♂️🔍</div>
+                    <h2 class="text-4xl font-black mb-2">¡Bienvenido, Detective!</h2>
+                    <p class="text-xl font-light opacity-90">Tenemos una misión muy importante para ti. Necesitamos tu ayuda para ordenar y clasificar todas las pistas del caso.</p>
+                </div>
+
+                <!-- Paso a Paso de la Actividad -->
+                <div class="bg-white border-4 border-blue-100 rounded-3xl p-6 shadow-lg mb-8 text-left">
+                    <h3 class="text-2xl font-bold text-blue-600 mb-6 text-center">📋 Paso a Paso de tu Misión</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Paso 1 -->
+                        <div class="bg-blue-50 p-5 rounded-2xl border border-blue-200">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="bg-blue-600 text-white font-bold w-8 h-8 flex items-center justify-center rounded-full text-lg">1</span>
+                                <h4 class="font-bold text-blue-900 text-lg">Conoce las Pistas</h4>
+                            </div>
+                            <p class="text-sm text-gray-700 leading-relaxed">
+                                Aprenderás qué significa cada categoría: <strong>¿Quién?</strong>, <strong>¿Dónde?</strong>, <strong>¿Qué?</strong>, <strong>¿Qué hace?</strong> y la <strong>Tarea</strong>.
+                            </p>
+                        </div>
+
+                        <!-- Paso 2 -->
+                        <div class="bg-purple-50 p-5 rounded-2xl border border-purple-200">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="bg-purple-600 text-white font-bold w-8 h-8 flex items-center justify-center rounded-full text-lg">2</span>
+                                <h4 class="font-bold text-purple-900 text-lg">Entrena tu Ojo</h4>
+                            </div>
+                            <p class="text-sm text-gray-700 leading-relaxed">
+                                Responderás preguntas rápidas de <strong>SÍ</strong> o <strong>NO</strong> para verificar si reconoces cada tipo de pista correctamente.
+                            </p>
+                        </div>
+
+                        <!-- Paso 3 -->
+                        <div class="bg-green-50 p-5 rounded-2xl border border-green-200">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="bg-green-600 text-white font-bold w-8 h-8 flex items-center justify-center rounded-full text-lg">3</span>
+                                <h4 class="font-bold text-green-900 text-lg">Clasifica el Archivo</h4>
+                            </div>
+                            <p class="text-sm text-gray-700 leading-relaxed">
+                                Arrastra cada imagen al cajón de pistas que le corresponda. ¡Obtén más de 87% de precisión para ganar la placa de maestría!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Indicaciones Importantes -->
+                <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 mb-8 text-left flex gap-4 items-start">
+                    <span class="text-3xl">💡</span>
+                    <div>
+                        <h4 class="font-bold text-amber-900 text-lg mb-1">Indicaciones para el Detective:</h4>
+                        <ul class="list-disc list-inside text-sm text-amber-900 space-y-1">
+                            <li>Escucha con atención los sonidos e instrucciones en pantalla.</li>
+                            <li>Si te equivocas, no te preocupes: ¡recibirás pistas para resolverlo!</li>
+                            <li>Tómate tu tiempo para pensar antes de mover cada tarjeta.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <button onclick="startTraining()" class="bg-green-500 hover:bg-green-600 text-white px-12 py-5 rounded-2xl text-2xl font-black shadow-xl hover:scale-105 active:scale-95 transition flex items-center gap-3">
+                <!-- Botón de Acción -->
+                <div class="flex justify-center items-center">
+                    <button onclick="startTraining()" class="bg-green-500 hover:bg-green-600 text-white px-12 py-5 rounded-2xl text-2xl font-black shadow-xl hover:scale-105 active:scale-95 transition flex items-center gap-3">
+                        🚀 ¡EMPEZAR MISIÓN!
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function selectGallery(galleryKey) {
+        currentGalleryKey = galleryKey;
+        const savedConfig = loadCustomConfig(galleryKey);
+        if (savedConfig) {
+            CONFIG = sanitizeConfig(savedConfig);
+        } else {
+            CONFIG = JSON.parse(JSON.stringify(GALLERIES[galleryKey]));
+        }
+        state.currentStage = 'acquisition';
+        render();
+    }
+
+    function renderConfig() {
+        updateStepHeader("Ajustes", "Configuración de Imágenes", "bg-purple-100 text-purple-800 border-purple-300");
+        mainContent.innerHTML = `
+            <div class="w-full max-w-4xl">
+                <h2 class="text-3xl font-bold mb-6 text-center">Subir Imágenes Personalizadas (Opcional)</h2>
+                <p class="text-gray-600 mb-8 text-center">Puedes agregar tus propias imágenes para cada categoría. Si no subes nada, se usarán las imágenes predeterminadas.</p>
+                
+                <div class="space-y-8">
+                    ${CONFIG.categories.map(cat => {
+                        const catLabel = cat.label || 'Categoría';
+                        const catSublabel = cat.sublabel || '';
+                        return `
+                        <div class="bg-gray-50 p-6 rounded-2xl border-2 border-gray-200">
+                            <h3 class="text-xl font-bold mb-4 text-blue-600">${catLabel} (${catSublabel})</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                                <p class="col-span-full text-sm font-bold text-green-600">✅ Ejemplos SI (Positivos):</p>
+                                ${cat.examples.filter(e => e.isPositive).map((example) => {
+                                    const realIdx = cat.examples.findIndex(e => e === example);
+                                    return `
+                                        <div class="flex flex-col items-center gap-2">
+                                            <img id="preview-${cat.id}-${realIdx}" src="${example.img}" class="w-24 h-24 object-cover rounded-lg shadow">
+                                            <input type="file" accept="image/*" onchange="handleImageUpload(event, '${cat.id}', ${realIdx})" class="text-xs">
+                                            <span class="text-xs font-bold text-gray-700">${example.name || 'Sin nombre'}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <p class="col-span-full text-sm font-bold text-red-600">❌ Ejemplos NO (Negativos):</p>
+                                ${cat.examples.filter(e => !e.isPositive).map((example) => {
+                                    const realIdx = cat.examples.findIndex(e => e === example);
+                                    return `
+                                        <div class="flex flex-col items-center gap-2">
+                                            <img id="preview-${cat.id}-${realIdx}" src="${example.img}" class="w-24 h-24 object-cover rounded-lg shadow">
+                                            <input type="file" accept="image/*" onchange="handleImageUpload(event, '${cat.id}', ${realIdx})" class="text-xs">
+                                            <span class="text-xs font-bold text-gray-700">${example.name || 'Sin nombre'}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;}).join('')}
+                </div>
+
+                <div class="mt-8 flex flex-wrap gap-4 justify-center items-center">
+                    <button onclick="exportCustomConfigJSON()" class="bg-indigo-600 text-white px-6 py-3 rounded-xl text-lg font-bold shadow-lg hover:bg-indigo-700 transition">
+                        📥 Exportar JSON
+                    </button>
+                    <label class="bg-teal-600 text-white px-6 py-3 rounded-xl text-lg font-bold shadow-lg hover:bg-teal-700 transition cursor-pointer">
+                        📤 Cargar JSON
+                        <input type="file" accept=".json" onchange="importCustomConfigJSON(event)" class="hidden">
+                    </label>
+                    <button onclick="resetCustomConfig()" class="bg-red-500 text-white px-6 py-3 rounded-xl text-lg font-bold shadow-lg hover:bg-red-600 transition">
+                        🔄 Restablecer
+                    </button>
+                    <button onclick="startTraining()" class="bg-blue-600 text-white px-12 py-5 rounded-2xl text-2xl font-bold shadow-lg hover:bg-blue-700 transition">
+                        🚀 Comenzar Entrenamiento
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function loadCustomConfig(galleryKey) {
+        const saved = localStorage.getItem(`anthophila_custom_config_${galleryKey}`);
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                console.error('Error loading custom config:', e);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    function exportCustomConfigJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(CONFIG, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `imagenes_personalizadas_galeria1.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function sanitizeConfig(config) {
+        if (!config || !config.categories) return config;
+        config.categories = config.categories.map(cat => {
+            if (cat.article === 'undefined' || !cat.article) cat.article = 'un';
+            if (cat.label === 'undefined') cat.label = '';
+            if (cat.sublabel === 'undefined') cat.sublabel = '';
+            if (cat.desc === 'undefined') cat.desc = '';
+            
+            if (cat.examples) {
+                cat.examples = cat.examples.map(ex => {
+                    if (ex.name === 'undefined') ex.name = '';
+                    return ex;
+                });
+            }
+            return cat;
+        });
+        return config;
+    }
+
+    function importCustomConfigJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedConfig = JSON.parse(e.target.result);
+                if (importedConfig && importedConfig.categories) {
+                    const defaultConfig = JSON.parse(JSON.stringify(GALLERIES.default));
+                    
+                    importedConfig.categories = importedConfig.categories.map(importedCat => {
+                        const defaultCat = defaultConfig.categories.find(c => c.id === importedCat.id) || {};
+                        const mergedCat = { ...defaultCat };
+                        Object.keys(importedCat).forEach(key => {
+                            if (importedCat[key] !== null && importedCat[key] !== undefined && importedCat[key] !== 'undefined') {
+                                mergedCat[key] = importedCat[key];
+                            }
+                        });
+                        mergedCat.examples = importedCat.examples || defaultCat.examples;
+                        return mergedCat;
+                    });
+
+                    CONFIG = sanitizeConfig(importedConfig);
+                    
+                    try {
+                        localStorage.setItem(`anthophila_custom_config_${currentGalleryKey}`, JSON.stringify(CONFIG));
+                        showCustomModal("Éxito", "Imágenes personalizadas cargadas y guardadas correctamente.", [{ text: "Aceptar" }]);
+                    } catch (storageErr) {
+                        showCustomModal("Aviso", "Las imágenes se cargaron para esta sesión, pero son demasiado grandes para guardarse permanentemente en localStorage.", [{ text: "Aceptar" }]);
+                    }
+                    
+                    renderConfig();
+                } else {
+                    showCustomModal("Error", "El archivo JSON no tiene el formato correcto.", [{ text: "Aceptar" }]);
+                }
+            } catch (err) {
+                showCustomModal("Error", "El archivo JSON es inválido o está dañado.", [{ text: "Aceptar" }]);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function handleImageUpload(event, catId, exampleIdx) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const cat = CONFIG.categories.find(c => c.id === catId);
+                cat.examples[exampleIdx].img = e.target.result;
+                document.getElementById(`preview-${catId}-${exampleIdx}`).src = e.target.result;
+                try {
+                    localStorage.setItem(`anthophila_custom_config_${currentGalleryKey}`, JSON.stringify(CONFIG));
+                } catch (err) {
+                    console.warn("Storage quota exceeded on image upload.");
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function startTraining() {
+        state.currentStage = 'acquisition';
+        state.catIdx = 0;
+        state.subStage = 'intro';
+        render();
+    }
+
+    function updateMasteryUI() {
+        if (!sessionDots) return;
+        sessionDots.innerHTML = '';
+        const history = state.sessionHistory.slice(-5);
+        for(let i=0; i<5; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'progress-dot';
+            if(history[i] === true) dot.classList.add('dot-success');
+            else if(history[i] === false) dot.classList.add('dot-fail');
+            sessionDots.appendChild(dot);
+        }
+    }
+
+    function render() {
+        if (!mainContent) return;
+        mainContent.innerHTML = '';
+        btnNext.classList.add('hidden');
+        clearTimeout(state.scaffoldingTimer);
+        state.supportLevel = 1;
+
+        if (state.currentStage === 'home') renderHome();
+        else if (state.currentStage === 'config') renderConfig();
+        else if (state.currentStage === 'acquisition') renderAcquisition();
+        else if (state.currentStage === 'sorting') renderSorting();
+        else renderResults();
+    }
+
+    function renderAcquisition() {
+        const cat = CONFIG.categories[state.catIdx];
+        if (!cat) return;
+
+        const catLabel = cat.label || 'Categoría';
+        const catSublabel = cat.sublabel || '';
+        const catDesc = cat.desc || '';
+        const catArticle = (cat.article && cat.article !== 'undefined') ? cat.article : 'un';
+
+        if (state.subStage === 'intro') {
+            updateStepHeader("Paso 1: Conociendo las Pistas", `${catLabel} (${catSublabel})`, "bg-blue-100 text-blue-800 border-blue-300");
+            mainContent.innerHTML = `
+                <div class="text-center animate-fadeIn">
+                    <h2 class="text-5xl font-bold mb-2 text-blue-600">${catLabel}</h2>
+                    <h3 class="text-3xl font-bold mb-8 text-gray-500">${catSublabel}</h3>
+                    <img src="${(cat.examples.find(e => e.isPositive) || {}).img}" class="w-80 h-80 object-cover rounded-3xl shadow-xl mx-auto mb-8 border-8 border-white">
+                    <p class="text-3xl font-medium max-w-2xl text-center leading-relaxed px-4">${catDesc}</p>
+                </div>
+            `;
+            speak(`${catLabel}. ${catDesc}`);
+            btnNext.classList.remove('hidden');
+            btnNext.onclick = () => {
+                state.subStage = 'concepts';
+                state.conceptQueue = [...cat.examples].sort(() => Math.random() - 0.5);
+                render();
+            };
+        } else if (state.subStage === 'concepts') {
+            updateStepHeader("Paso 2: Entrenando el Ojo", `Reconociendo: ${catLabel}`, "bg-purple-100 text-purple-800 border-purple-300");
+            if (state.conceptQueue.length === 0) {
+                state.subStage = 'test';
+                render();
+                return;
+            }
+            state.currentConcept = state.conceptQueue.pop();
+            const conceptName = state.currentConcept.name || 'este elemento';
+            const questionText = `¿Es ${conceptName} ${catArticle} ${catSublabel}?`;
+            mainContent.innerHTML = `
+                <div class="text-center">
+                    <h2 class="text-4xl font-bold mb-10">${questionText}</h2>
+                    <div class="bg-white p-4 rounded-3xl shadow-lg inline-block mb-10">
+                        <img src="${state.currentConcept.img}" class="w-72 h-72 object-cover rounded-2xl mx-auto shadow-md">
+                        <p class="text-2xl font-bold mt-4 text-gray-700">${conceptName}</p>
+                    </div>
+                    <div class="flex gap-12 justify-center">
+                        <button onclick="handleConcept(true)" class="bg-green-500 text-white text-4xl px-16 py-8 rounded-3xl font-bold shadow-xl active:scale-95 transition">SÍ</button>
+                        <button onclick="handleConcept(false)" class="bg-red-500 text-white text-4xl px-16 py-8 rounded-3xl font-bold shadow-xl active:scale-95 transition">NO</button>
+                    </div>
+                </div>
+            `;
+            speak(questionText);
+        } else if (state.subStage === 'test') {
+            updateStepHeader("Paso 2: Entrenando el Ojo", `Prueba de Ubicación (${catLabel})`, "bg-purple-100 text-purple-800 border-purple-300");
+            const posExample = cat.examples.find(e => e.isPositive) || cat.examples[0];
+            const posName = posExample.name || 'este elemento';
+            mainContent.innerHTML = `
+                <div class="text-center w-full">
+                    <h2 class="text-3xl font-bold mb-10">¿A qué categoría pertenece ${posName}?</h2>
+                    <div class="flex flex-col items-center gap-10">
+                        <div id="drag-item" class="p-4 bg-white rounded-2xl shadow-lg border-2 border-gray-100">
+                            <img src="${posExample.img}" class="w-56 h-56 object-cover rounded-xl draggable-card" draggable="true">
+                            <p class="text-2xl font-bold mt-4">${posName}</p>
+                        </div>
+                        <div class="flex flex-wrap justify-center gap-6">
+                            ${CONFIG.categories.map(c => `
+                                <div ondragover="event.preventDefault()" ondrop="handleTestDrop('${c.id}', '${cat.id}')" 
+                                     id="drop-${c.id}" class="w-44 h-44 ${c.color || 'bg-gray-100'} ${c.borderColor || 'border-gray-400'} border-4 rounded-3xl flex flex-col items-center justify-center p-4 drop-zone">
+                                    <span class="text-xl font-bold text-center leading-tight">${c.label || '...'}</span>
+                                    <span class="text-[10px] font-bold text-gray-500 uppercase mt-2">${c.sublabel || ''}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    function handleConcept(userSaidYes) {
+        const correct = userSaidYes === state.currentConcept.isPositive;
+        if (correct) {
+            showFeedback(true, "¡Correcto!");
+            setTimeout(render, 1500);
+        } else {
+            showFeedback(false, "Fíjate bien");
+            speak(`Recuerda: ${CONFIG.categories[state.catIdx].desc}`);
+        }
+    }
+
+    function handleTestDrop(droppedId, correctId) {
+        if (droppedId === correctId) {
+            showFeedback(true, "¡Excelente!");
+            if (state.catIdx < CONFIG.categories.length - 1) {
+                state.catIdx++;
+                state.subStage = 'intro';
+            } else {
+                state.currentStage = 'sorting';
+                state.unpromptedScore = 0;
+                state.catIdx = 0;
+                state.sortingItems = generateSortingList();
+                state.sortingDetails = []; 
+            }
+            setTimeout(render, 1500);
+        } else {
+            showFeedback(false, "Ese no es el cajón");
+            clearTimeout(state.scaffoldingTimer);
+            applyNextSupportLevel(correctId, `drop-${correctId}`);
+        }
+    }
+
+    function generateSortingList() {
+        let list = [];
+        CONFIG.categories.forEach(c => {
+            const positives = c.examples.filter(e => e.isPositive);
+            list.push({ ...positives[0], category: c.id, categoryLabel: c.label, placed: false, id: Math.random() });
+            list.push({ ...positives[1], category: c.id, categoryLabel: c.label, placed: false, id: Math.random() });
+        });
+        return list.sort(() => Math.random() - 0.5);
+    }
+
+    function renderSorting() {
+        updateStepHeader("Paso 3: Clasificando el Archivo", "Misión Final de Clasificación", "bg-green-100 text-green-800 border-green-300");
+
+        const item = state.sortingItems.find(i => !i.placed);
+        if (!item) {
+            state.currentStage = 'result';
+            render();
+            return;
+        }
+
+        mainContent.innerHTML = `
+            <div class="w-full">
+                <div class="flex justify-center mb-10">
+                    <div id="drag-source" class="bg-white p-5 rounded-3xl shadow-2xl border-4 border-blue-100 flex flex-col items-center">
+                        <img src="${item.img}" class="w-52 h-52 object-cover rounded-2xl mb-4" draggable="true">
+                        <span class="text-2xl font-bold">${item.name}</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    ${CONFIG.categories.map(c => `
+                        <div id="zone-${c.id}" ondragover="event.preventDefault()" ondrop="handleSortingDrop('${c.id}', '${item.category}', ${item.id})"
+                             class="drop-zone ${c.color} ${c.borderColor} border-4 border-b-8 rounded-3xl p-4 flex flex-col items-center">
+                            <h3 class="text-lg font-bold text-center leading-tight">${c.label}</h3>
+                            <p class="text-[10px] font-bold text-gray-500 mb-4 uppercase">${c.sublabel}</p>
+                            <div class="flex flex-wrap gap-1 justify-center">
+                                ${state.sortingItems.filter(si => si.placed && si.category === c.id).map(si => `
+                                    <div class="bg-white p-1 rounded-lg border shadow-sm">
+                                        <img src="${si.img}" class="w-10 h-10 object-cover rounded">
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        speak(`¿En qué cajón va: ${item.name}?`);
+    }
+
+    function handleSortingDrop(droppedId, correctId, itemId) {
+        const item = state.sortingItems.find(i => i.id === itemId);
+        if (!item) return;
+
+        if (droppedId === correctId) {
+            const supportInfo = SUPPORT_LEVELS[state.supportLevel] || { name: 'Ayuda desconocida' };
+            state.sortingDetails.push({
+                nombre: item.name || 'Sin nombre',
+                categoria: item.categoryLabel || 'Sin categoría',
+                independiente: state.supportLevel === 1,
+                nivelApoyo: state.supportLevel,
+                ayuda: supportInfo.name
+            });
+
+            if (state.supportLevel === 1) state.unpromptedScore++;
+            item.placed = true;
+            showFeedback(true, "¡Bien hecho!");
+            setTimeout(render, 1000);
+        } else {
+            showFeedback(false, "Intenta en otro lugar");
+            clearTimeout(state.scaffoldingTimer);
+            applyNextSupportLevel(correctId, `zone-${correctId}`);
+        }
+    }
+
+    function applyNextSupportLevel(correctId, elId) {
+        if (state.supportLevel >= state.maxSupportLevel) return;
+        
+        state.supportLevel++;
+        const el = document.getElementById(elId);
+        const cat = CONFIG.categories.find(c => c.id === correctId);
+
+        if (state.supportLevel === 2) {
+            speak(`Recuerda: ${cat.desc}`);
+        } else if (state.supportLevel === 3) {
+            if (el) el.classList.add('highlight');
+        } else if (state.supportLevel === 4) {
+            if (el) el.classList.add('highlight');
+            speak(`${cat.desc} Este ítem va aquí.`);
+        }
+    }
+
+    function downloadJSON() {
+        const report = {
+            fecha: new Date().toISOString(),
+            precision: Math.round((state.unpromptedScore / state.sortingItems.length) * 100),
+            itemsIndependientes: state.unpromptedScore,
+            totalItems: state.sortingItems.length,
+            estabilidad: state.sessionHistory.slice(-5).filter(s => s === true).length + '/5',
+            detalles: state.sortingDetails
+        };
+        
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(report, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "informe_anthophila.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function renderResults() {
+        updateStepHeader("Resultados", "Reporte de la Misión", "bg-emerald-100 text-emerald-800 border-emerald-300");
+
+        const totalItemsInSorting = state.sortingItems.length;
+        const precision = Math.round((state.unpromptedScore / totalItemsInSorting) * 100);
+        const success = precision >= 87;
+        
+        state.sessionHistory.push(success);
+        localStorage.setItem('anthophila_mastery', JSON.stringify(state.sessionHistory));
+        updateMasteryUI();
+
+        mainContent.innerHTML = `
+            <div class="w-full max-w-4xl bg-white p-8 rounded-3xl shadow-2xl border-4 ${success ? 'border-green-500' : 'border-red-400'}">
+                <div class="text-center mb-8">
+                    <h2 class="text-4xl font-bold mb-2">${success ? '¡Maestría Lograda!' : 'Ensayo en Progreso'}</h2>
+                    <p class="text-xl text-gray-500 italic">Sesión de Evaluación de Clasificación Wh-</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <div class="bg-blue-50 p-6 rounded-2xl text-center border-2 border-blue-100">
+                        <p class="text-sm font-bold uppercase text-blue-400 mb-1">Aciertos Libres</p>
+                        <p class="text-5xl font-black text-blue-600">${precision}%</p>
+                        <p class="text-xs mt-2 font-semibold">Meta: 87%</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-2xl text-center border-2 border-gray-100">
+                        <p class="text-sm font-bold uppercase text-gray-400 mb-1">Items Independientes</p>
+                        <p class="text-5xl font-black text-gray-700">${state.unpromptedScore}/${totalItemsInSorting}</p>
+                        <p class="text-xs mt-2 font-semibold">Sin ayuda externa</p>
+                    </div>
+                    <div class="bg-orange-50 p-6 rounded-2xl text-center border-2 border-orange-100">
+                        <p class="text-sm font-bold uppercase text-orange-400 mb-1">Estabilidad</p>
+                        <p class="text-5xl font-black text-orange-600">${state.sessionHistory.slice(-5).filter(s => s === true).length}/5</p>
+                        <p class="text-xs mt-2 font-semibold">Últimas sesiones</p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto mb-10">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 border-b">
+                                <th class="p-4 text-xs font-bold uppercase text-gray-600">Ítem (Estímulo)</th>
+                                <th class="p-4 text-xs font-bold uppercase text-gray-600">Categoría</th>
+                                <th class="p-4 text-xs font-bold uppercase text-gray-600">Estatus</th>
+                                <th class="p-4 text-xs font-bold uppercase text-gray-600">Nivel de Apoyo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${state.sortingDetails.map(d => `
+                                <tr class="border-b hover:bg-gray-50 transition">
+                                    <td class="p-4 font-bold text-gray-700">${d.nombre}</td>
+                                    <td class="p-4 text-gray-600 text-sm">${d.categoria}</td>
+                                    <td class="p-4">
+                                        <span class="px-3 py-1 rounded-full text-xs font-bold ${d.independiente ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">
+                                            ${d.independiente ? 'INDEPENDIENTE' : 'CON AYUDA'}
+                                        </span>
+                                    </td>
+                                    <td class="p-4 text-gray-500 text-xs italic">${d.ayuda}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-4 justify-center items-center">
+                    <button onclick="resetSession()" class="bg-blue-600 text-white px-10 py-5 rounded-2xl text-xl font-bold hover:bg-blue-700 shadow-xl transition active:scale-95">
+                        Reiniciar Ensayo
+                    </button>
+                    <button onclick="downloadJSON()" class="bg-green-600 text-white px-10 py-5 rounded-2xl text-xl font-bold hover:bg-green-700 shadow-xl transition active:scale-95">
+                        📥 Descargar JSON
+                    </button>
+                    <button onclick="window.print()" class="text-gray-500 font-bold hover:text-blue-600 transition">
+                        🖨️ Imprimir Reporte
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function resetSession() {
+        state.currentStage = 'acquisition';
+        state.catIdx = 0;
+        state.subStage = 'intro';
+        state.unpromptedScore = 0;
+        state.sortingDetails = [];
+        state.supportLevel = 1;
+        render();
+    }
+
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'es-ES';
+            msg.rate = 0.85;
+            window.speechSynthesis.speak(msg);
+        }
+    }
+
+    function showFeedback(success, text) {
+        const overlay = document.getElementById('feedback');
+        const icon = document.getElementById('feedback-icon');
+        const txt = document.getElementById('feedback-text');
+        if (!overlay || !icon || !txt) return;
+        
+        overlay.style.display = 'flex';
+        icon.innerText = success ? '🌟' : '💡';
+        txt.innerText = text;
+        txt.className = `text-4xl font-bold ${success ? 'text-green-600' : 'text-orange-500'}`;
+        setTimeout(() => overlay.style.display = 'none', 1500);
+    }
+
+    window.onload = init;
+</script>
+
+</body>
+</html>
